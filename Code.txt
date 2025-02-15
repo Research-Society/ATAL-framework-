@@ -1,0 +1,175 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision.models as models
+import torchvision.transforms as transforms
+from torchvision.datasets import ImageFolder
+from torch.utils.data import DataLoader, random_split
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image, ImageFilter
+
+# Set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# -------------------------------
+# 1. Data Preprocessing Function
+# -------------------------------
+def degrade_image(image, blur_radius=2, brightness_factor=0.7):
+    """Applies Gaussian blur and brightness reduction to simulate low-quality images."""
+    image = image.filter(ImageFilter.GaussianBlur(blur_radius))
+    image = transforms.functional.adjust_brightness(image, brightness_factor)
+    return image
+
+# Define Transformations
+transform_high_quality = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+])
+
+transform_low_quality = transforms.Compose([
+    transforms.Lambda(lambda img: degrade_image(img)),  # Apply degradation
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+])
+
+# Load Sample Dataset (Using CIFAR-10 for Simplicity)
+dataset = ImageFolder(root="path/to/dataset", transform=transform_high_quality)
+
+# Splitting dataset into training and validation
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+# Create DataLoaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+# -------------------------------
+# 2. Model Definition (ResNet50)
+# -------------------------------
+class ATAL_ResNet(nn.Module):
+    def __init__(self, num_classes=10):
+        super(ATAL_ResNet, self).__init__()
+        self.backbone = models.resnet50(pretrained=True)
+        self.backbone.fc = nn.Linear(self.backbone.fc.in_features, num_classes)
+
+    def forward(self, x):
+        return self.backbone(x)
+
+# Initialize Teacher and Student Models
+teacher_model = ATAL_ResNet(num_classes=10).to(device)
+student_model = ATAL_ResNet(num_classes=10).to(device)
+
+# -------------------------------
+# 3. Loss Functions
+# -------------------------------
+class KnowledgeDistillationLoss(nn.Module):
+    """KL Divergence loss for knowledge distillation"""
+    def __init__(self, temperature=4.0):
+        super(KnowledgeDistillationLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(self, student_logits, teacher_logits):
+        teacher_probs = F.softmax(teacher_logits / self.temperature, dim=1)
+        student_probs = F.log_softmax(student_logits / self.temperature, dim=1)
+        return F.kl_div(student_probs, teacher_probs, reduction='batchmean') * (self.temperature ** 2)
+
+class TextureGuidedLoss(nn.Module):
+    """Texture loss using Gram Matrix for feature alignment"""
+    def __init__(self):
+        super(TextureGuidedLoss, self).__init__()
+
+    def forward(self, student_features, teacher_features):
+        gram_s = torch.mm(student_features, student_features.T)
+        gram_t = torch.mm(teacher_features, teacher_features.T)
+        return F.mse_loss(gram_s, gram_t)
+
+# Loss Functions
+ce_loss = nn.CrossEntropyLoss()
+kd_loss = KnowledgeDistillationLoss()
+tg_loss = TextureGuidedLoss()
+
+# Optimizers
+optimizer_teacher = optim.Adam(teacher_model.parameters(), lr=0.001)
+optimizer_student = optim.Adam(student_model.parameters(), lr=0.001)
+
+# -------------------------------
+# 4. Training the Teacher Model
+# -------------------------------
+def train_teacher(model, train_loader, optimizer, criterion, epochs=5):
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        print(f"Epoch [{epoch+1}/{epochs}], Teacher Loss: {total_loss/len(train_loader):.4f}")
+
+# Train the Teacher Model
+train_teacher(teacher_model, train_loader, optimizer_teacher, ce_loss, epochs=5)
+
+# -------------------------------
+# 5. Training the Student Model
+# -------------------------------
+def train_student(teacher_model, student_model, train_loader, optimizer, ce_loss, kd_loss, tg_loss, epochs=5):
+    teacher_model.eval()
+    student_model.train()
+    
+    for epoch in range(epochs):
+        total_loss = 0
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            optimizer.zero_grad()
+            
+            with torch.no_grad():
+                teacher_outputs = teacher_model(images)
+            
+            student_outputs = student_model(images)
+            id_loss = ce_loss(student_outputs, labels)
+            kd_loss_val = kd_loss(student_outputs, teacher_outputs)
+            tg_loss_val = tg_loss(student_outputs, teacher_outputs)
+
+            loss = id_loss + 0.5 * kd_loss_val + 0.3 * tg_loss_val
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+        
+        print(f"Epoch [{epoch+1}/{epochs}], Student Loss: {total_loss/len(train_loader):.4f}")
+
+# Train the Student Model
+train_student(teacher_model, student_model, train_loader, optimizer_student, ce_loss, kd_loss, tg_loss, epochs=5)
+
+# -------------------------------
+# 6. Model Evaluation
+# -------------------------------
+def evaluate_model(model, val_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs, 1)
+            correct += (predicted == labels).sum().item()
+            total += labels.size(0)
+
+    accuracy = 100 * correct / total
+    print(f"Validation Accuracy: {accuracy:.2f}%")
+    return accuracy
+
+# Evaluate the trained student model
+evaluate_model(student_model, val_loader)
+
