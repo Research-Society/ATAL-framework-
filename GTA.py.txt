@@ -1,0 +1,15 @@
+def gram_matrix(x):
+    batch_size, channels, height, width = x.size()
+    features = x.view(batch_size * channels, height * width)
+    gram = torch.mm(features, features.t())
+    gram = gram.div(batch_size * channels * height * width)  # Normalize the Gram matrix
+    return gram
+
+def gradient_texture_alignment(teacher_features, student_features):
+    # Calculate Gram matrices for both teacher and student features
+    teacher_gram = gram_matrix(teacher_features)
+    student_gram = gram_matrix(student_features)
+    
+    # Return the L2 loss between both Gram matrices
+    loss = nn.MSELoss()(student_gram, teacher_gram)
+    return loss

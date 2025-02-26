@@ -1,0 +1,13 @@
+class SATGLoss(nn.Module):
+    def __init__(self):
+        super(SATGLoss, self).__init__()
+
+    def forward(self, teacher_features, student_features):
+        texture_loss = gradient_texture_alignment(teacher_features, student_features)
+        # Add any other spatial attention-related loss terms if needed
+        attention_loss = self.compute_attention_loss(teacher_features, student_features)
+        return texture_loss + attention_loss
+
+    def compute_attention_loss(self, teacher_features, student_features):
+        # This function can be implemented to calculate spatial attention loss based on Grad-CAM, etc.
+        return nn.MSELoss()(teacher_features, student_features)  # Example

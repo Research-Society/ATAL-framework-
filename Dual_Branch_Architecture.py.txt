@@ -1,0 +1,24 @@
+import torch
+import torch.nn as nn
+import torchvision.models as models
+
+class TeacherModel(nn.Module):
+    def __init__(self):
+        super(TeacherModel, self).__init__()
+        self.resnet = models.resnet50(pretrained=True)
+        # You can replace with any pre-trained model or custom backbone
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 512)  # Example: output feature size = 512
+
+    def forward(self, x):
+        return self.resnet(x)
+
+
+class StudentModel(nn.Module):
+    def __init__(self):
+        super(StudentModel, self).__init__()
+        self.resnet = models.resnet50(pretrained=True)
+        # Output size should be same as teacher model
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 512)
+
+    def forward(self, x):
+        return self.resnet(x)

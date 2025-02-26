@@ -1,0 +1,16 @@
+Dual-Branch Architecture:
+
+One branch processes high-quality images (the teacher model) and the other processes low-quality images (the student model).
+The teacher model is trained first on high-quality datasets, and the student model learns from low-quality images using a gradient-guided transfer mechanism.
+Grad-CAM-Based Attention:
+
+Grad-CAM (Gradient-weighted Class Activation Mapping) is used to apply spatial attention, focusing the student model on important facial regions (like eyes and mouth) to improve recognition under degraded conditions.
+Gradient Texture Alignment (GTA):
+
+This technique aligns the gradient-based texture details between the teacher and student models. Gram matrices are used to preserve the structural information of gradient maps, improving the texture alignment across different image qualities.
+SA-TG Loss (Soft-Attention Texture-Guided Loss):
+
+This loss function combines gradient texture alignment with attention-based refinement to help the student model retain fine-grained texture details despite image degradation.
+Rank-1, Rank-5, CMC (Cumulative Match Characteristics) Evaluation:
+
+Evaluation metrics such as Rank-1, Rank-5 accuracy, and CMC curves are used to assess the performance of the face recognition model. These metrics measure how well the model ranks the correct identity among the top predictions (Rank-1) and among the top 5 or more predictions (Rank-5).

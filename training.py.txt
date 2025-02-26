@@ -1,0 +1,23 @@
+def train(teacher_model, student_model, train_loader, optimizer, epoch):
+    teacher_model.eval()  # Teacher is in evaluation mode
+    student_model.train()
+    
+    total_loss = 0
+    for images, labels in train_loader:
+        optimizer.zero_grad()
+        
+        # Forward pass
+        teacher_features = teacher_model(images)
+        student_features = student_model(images)
+
+        # Compute losses
+        kd_loss = KDLoss()(teacher_features, student_features)
+        satg_loss = SATGLoss()(teacher_features, student_features)
+
+        loss = kd_loss + satg_loss
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+    
+    print(f"Epoch {epoch}, Loss: {total_loss/len(train_loader)}")

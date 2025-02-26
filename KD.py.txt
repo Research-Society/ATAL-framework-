@@ -1,0 +1,7 @@
+class KDLoss(nn.Module):
+    def __init__(self):
+        super(KDLoss, self).__init__()
+
+    def forward(self, teacher_output, student_output):
+        # Using KL Divergence Loss to align teacher and student predictions
+        return nn.KLDivLoss(reduction='batchmean')(F.log_softmax(student_output, dim=1), F.softmax(teacher_output, dim=1))

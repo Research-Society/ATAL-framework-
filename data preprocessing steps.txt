@@ -1,0 +1,37 @@
+Table 2: Pseudocode for the proposed ATAL Framework
+
+Input:
+	X_H → High-quality face image
+	X_L → Low-quality face image
+	M_T → Teacher Model
+	M_S → Student Model
+	λ → Knowledge transfer weight
+Output:
+	R_L → Predicted identity for low-quality face
+
+Step 1: Train Teacher Model
+	Train M_T on high-quality images X_H.
+	Extract features: F_H\ = {M_T\ (X}_H)
+	Compute classification loss: \mathcal{L}_{\mathcal{c}\ell\mathcal{s}}=\mathrm{CrossEntropy}\left(F_H,Y_H\right)
+
+Step 2: Knowledge Transfer to Student Model
+	Extract features from F_L=M_S\left(X_L\right)
+	Apply Knowledge Distillation (KD): \mathcal{L}_{\mathcal{KD}}=|F_H-F_L|^2
+	Compute total loss:  \mathcal{L}_{\mathcal{tota}\ell}=\mathcal{L}_{\mathcal{c}\ell\mathcal{s}}+\lambda\mathcal{L}_{\mathcal{KD}}
+
+Step 3: Feature Enhancement & Recognition
+	Gradient Texture Alignment (GTA) minimizes texture difference: \mathcal{L}_{\mathcal{GTA}}=|\mathrm{\nabla}X_H-\mathrm{\nabla}X_L|^2
+	Dynamic Spatial Attention (DSA) enhances key features: F_L^\prime=A\odot F_L
+\odot\ \rightarrow\ \  Hadamard Multiplication (Element-wise Multiplication) between two matrices of the same dimensions.
+	Extract robust features: F_L^{\prime\prime}=M_S\left(F_L^\prime\right)
+
+Step 4: Prediction & Model Optimization
+	Predict face identity: R_L=\mathrm{Softmax}\left(W\cdot F_L^{\prime\prime}\right)
+	Optimize student model using: \mathcal{L}_{\mathcal{fina}\ell}=\mathcal{L}_{\mathcal{tota}\ell}+\mathcal{L}_{\mathcal{GTA}}
+	Train until convergence.
+
+Final Output:
+	R_L → Robust face recognition for low-quality images. 
+
+
+
