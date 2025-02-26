@@ -1,2 +1,0 @@
-[1]	TinyFace: Face Recognition in Native Low-resolution Imagery,  available online at: https://qmul-tinyface.github.io/ 
-[2]	QMUL-SurvFace: Surveillance Face Recognition Challenge, available online at: https://qmul-survface.github.io/ 
